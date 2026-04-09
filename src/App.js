@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
-const BACKEND_URL = 'https://location-backend-3cdl.onrender.com';
+const BACKEND_URL = 'https://location-backend-i26t.onrender.com';
 
 function App() {
   const [ready, setReady] = useState(false);
